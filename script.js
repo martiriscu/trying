@@ -14,7 +14,6 @@ document.addEventListener('DOMContentLoaded', function() {
         "LinkedIn": "https://www.linkedin.com/in/monicagottardi",
         "Behance": "https://www.behance.net/monicagottardi",
         "Mail": "mailto:monicagottardi@outlook.com"
-        // "Music" and "Settings" removed
     };
     
     // Initialize active menu item
@@ -65,7 +64,7 @@ document.addEventListener('DOMContentLoaded', function() {
     clickwheel.addEventListener('click', function(event) {
         const action = event.target.closest('[data-action]')?.dataset.action;
         if (!action) return;
- 
+    
         // If a game is active, only handle 'menu' button to exit
         if (gameMode) {
             if (action === 'menu') {
@@ -74,7 +73,7 @@ document.addEventListener('DOMContentLoaded', function() {
             // All other buttons are handled by the game's internal logic
             return; 
         }
- 
+    
         // Normal menu navigation
         switch(action) {
             case 'menu':
@@ -141,13 +140,13 @@ document.addEventListener('DOMContentLoaded', function() {
     menuItems[currentIndex].classList.add('active');
     menuItems[currentIndex].scrollIntoView({ behavior: 'smooth', block: 'nearest' });
     previewImage.src = menuItems[currentIndex].dataset.preview;
- 
+    
     // Function to restore the main menu view
     function restoreMenu() {
         // Reloading the page is the simplest way to reset all game state and re-bind menu listeners
         location.reload(); 
     }
- 
+    
     // Function to start the Breakout game
     function startBreakoutGame() {
         // Replace the entire screen content with the game canvas and instructions
@@ -161,29 +160,29 @@ document.addEventListener('DOMContentLoaded', function() {
         setTimeout(() => initBreakoutGame(screenRect.width, screenRect.height), 50); 
         gameMode = true; // Set game mode flag
     }
- 
+    
     // Function to exit the game
     function exitGame() {
         gameMode = false; // Reset game mode flag
         restoreMenu(); // Go back to the main menu
     }
- 
+    
     // Breakout Game Logic
     // Pass canvas dimensions directly to avoid relying on clientWidth/Height which might be fractional
     function initBreakoutGame(canvasDisplayWidth, canvasDisplayHeight) {
         const canvas = document.getElementById('breakout-game');
         const ctx = canvas.getContext('2d');
- 
+    
         // Get device pixel ratio for sharp rendering on high-DPI screens
         const dpr = window.devicePixelRatio || 1;
- 
+    
         // Set canvas drawing buffer size (internal resolution)
         canvas.width = canvasDisplayWidth * dpr;
         canvas.height = canvasDisplayHeight * dpr;
- 
+    
         // Scale the context to match the device pixel ratio
         ctx.scale(dpr, dpr);
- 
+    
         // Game variables (sizes relative to canvas's CSS dimensions)
         let paddleWidth = canvasDisplayWidth * 0.25;
         let paddleHeight = canvasDisplayHeight * 0.03;
@@ -197,69 +196,102 @@ document.addEventListener('DOMContentLoaded', function() {
         let running = false; // Game running state
         let paused = true; // Game starts paused
         let lastAngle = null; // For clickwheel paddle control
- 
+    
         // Brick properties
-        const brickRowCount = 3;
-        const brickColumnCount = 5;
-        const brickWidth = (canvasDisplayWidth / brickColumnCount) * 0.7; // Smaller bricks
-        const brickHeight = canvasDisplayHeight * 0.04; // Slightly smaller height
-        const brickPadding = (canvasDisplayWidth / brickColumnCount) * 0.1; // More padding for centering
-        const brickOffsetTop = canvasDisplayHeight * 0.15; // Bricks suspended from top
-        const brickOffsetLeft = (canvasDisplayWidth - (brickColumnCount * (brickWidth + brickPadding))) / 2 + brickPadding / 2; // Centered
+        const brickRowCount = 3; // 3 rows
+        const maxBrickColumnCount = 6; // 6 columns
+        const brickHeight = canvasDisplayHeight * 0.05; // Taller bricks (increased from 0.04)
+        const brickPadding = canvasDisplayWidth * 0.01; // Smaller padding between bricks (was 0.05)
+        const sideMargin = canvasDisplayWidth * 0.05; // Margin from the sides of the display
+        const brickOffsetTop = canvasDisplayHeight * 0.1; // Bricks suspended from top
+        
         let bricks = []; // Array to hold brick objects
- 
+    
         // Define gradient colors for different HP levels (more prominent)
         const brickColors = {
-            3: ['#003366', '#001133'], // Darkest blue for 3 HP (deep, rich)
-            2: ['#0077b6', '#005588'], // Medium blue for 2 HP (standard)
-            1: ['#00b4d8', '#0099cc']  // Lightest blue for 1 HP (bright)
+            3: ['#003366', '#001133'], // Darkest blue for 3 HP (top row)
+            2: ['#0077b6', '#005588'], // Medium blue for 2 HP (middle row)
+            1: ['#00b4d8', '#0099cc']  // Lightest blue for 1 HP (bottom row)
         };
- 
-        // Initialize bricks with organized HP
+    
+        // Initialize bricks with organized HP and pyramid layout
         function initBricks() {
             bricks = []; // Clear existing bricks
-            for (let c = 0; c < brickColumnCount; c++) {
-                bricks[c] = [];
-                for (let r = 0; r < brickRowCount; r++) {
-                    // Assign HP based on row: top row (r=0) = 3 HP, middle (r=1) = 2 HP, bottom (r=2) = 1 HP
+            for (let r = 0; r < brickRowCount; r++) {
+                bricks[r] = [];
+                // Each row has one less brick than the row above, starting from maxBrickColumnCount
+                const currentColumnCount = maxBrickColumnCount - r; 
+                
+                // Calculate brick width for the current row to fit and be centered
+                // The total width available for bricks and their internal padding in this row
+                const totalInternalPaddingWidth = (currentColumnCount - 1) * brickPadding;
+                const availableWidthForBricksInRow = canvasDisplayWidth - (2 * sideMargin) - totalInternalPaddingWidth;
+                const currentBrickWidth = availableWidthForBricksInRow / currentColumnCount;
+                
+                // Centering offset for current row, starting after the sideMargin
+                const rowOffsetLeft = sideMargin;
+    
+                for (let c = 0; c < currentColumnCount; c++) {
+                    // Assign HP based on row: top row (r=0) = 3 HP, r=1 = 2 HP, bottom (r=2) = 1 HP
                     const hp = brickRowCount - r; 
-                    bricks[c][r] = { x: 0, y: 0, status: 1, hp: hp }; 
+                    bricks[r][c] = { 
+                        x: rowOffsetLeft + (c * (currentBrickWidth + brickPadding)),
+                        y: (r * (brickHeight + brickPadding)) + brickOffsetTop,
+                        width: currentBrickWidth, // Use consistent width
+                        height: brickHeight, // Store height for this brick
+                        status: 1, 
+                        hp: hp 
+                    }; 
                 }
             }
         }
- 
+    
         // Draw bricks on canvas
         function drawBricks() {
-            for (let c = 0; c < brickColumnCount; c++) {
-                for (let r = 0; r < brickRowCount; r++) {
-                    if (bricks[c][r].status === 1) {
-                        let brick = bricks[c][r];
-                        let brickX = (c * (brickWidth + brickPadding)) + brickOffsetLeft;
-                        let brickY = (r * (brickHeight + brickPadding)) + brickOffsetTop;
-                        brick.x = brickX; // Update brick's actual position
-                        brick.y = brickY;
-                        
+            for (let r = 0; r < brickRowCount; r++) { // Iterate through rows
+                for (let c = 0; c < bricks[r].length; c++) { // Iterate through actual bricks in row
+                    let b = bricks[r][c];
+                    if (b.status === 1) {
                         // Get colors based on brick's HP
-                        const colors = brickColors[brick.hp] || brickColors[1]; // Fallback to 1 HP color
+                        const colors = brickColors[b.hp] || brickColors[1]; 
                         
                         // Create a linear gradient for the brick
-                        const brickGradient = ctx.createLinearGradient(brickX, brickY, brickX, brickY + brickHeight);
+                        const brickGradient = ctx.createLinearGradient(b.x, b.y, b.x, b.y + b.height);
                         brickGradient.addColorStop(0, colors[0]); 
                         brickGradient.addColorStop(1, colors[1]); 
                         
-                        ctx.fillStyle = brickGradient; // Use the gradient as fill style
-                        ctx.fillRect(brickX, brickY, brickWidth, brickHeight);
+                        ctx.fillStyle = brickGradient; 
+                        ctx.fillRect(b.x, b.y, b.width, b.height);
+    
+                        // --- Add internal shadows/highlights for 3D effect ---
+                        // Darker shadow on bottom and right edges
+                        ctx.strokeStyle = 'rgba(0,0,0,0.3)'; // Darker shade
+                        ctx.lineWidth = 1; // Thin line
+                        ctx.beginPath();
+                        ctx.moveTo(b.x + b.width, b.y);
+                        ctx.lineTo(b.x + b.width, b.y + b.height);
+                        ctx.lineTo(b.x, b.y + b.height);
+                        ctx.stroke();
+    
+                        // Lighter highlight on top and left edges
+                        ctx.strokeStyle = 'rgba(255,255,255,0.4)'; // Lighter shade
+                        ctx.beginPath();
+                        ctx.moveTo(b.x, b.y + b.height);
+                        ctx.lineTo(b.x, b.y);
+                        ctx.lineTo(b.x + b.width, b.y);
+                        ctx.stroke();
+                        // --- End internal shadows/highlights ---
                     }
                 }
             }
         }
- 
+    
         // Draw paddle on canvas
         function drawPaddle() {
             ctx.fillStyle = "white"; // Paddle color
             ctx.fillRect(paddleX, canvasDisplayHeight - paddleHeight - 2, paddleWidth, paddleHeight);
         }
- 
+    
         // Draw ball on canvas
         function drawBall() {
             ctx.beginPath();
@@ -268,15 +300,15 @@ document.addEventListener('DOMContentLoaded', function() {
             ctx.fill();
             ctx.closePath();
         }
- 
+    
         // Collision Detection for ball and bricks
         function collisionDetection() {
-            for (let c = 0; c < brickColumnCount; c++) {
-                for (let r = 0; r < brickRowCount; r++) {
-                    let b = bricks[c][r];
+            for (let r = 0; r < brickRowCount; r++) { // Iterate through rows
+                for (let c = 0; c < bricks[r].length; c++) { // Iterate through actual bricks in row
+                    let b = bricks[r][c];
                     if (b.status === 1) { // Only check visible bricks
-                        if (ballX > b.x && ballX < b.x + brickWidth &&
-                            ballY > b.y && ballY < b.y + brickHeight) {
+                        if (ballX > b.x && ballX < b.x + b.width &&
+                            ballY > b.y && ballY < b.y + b.height) {
                             ballDY = -ballDY; // Reverse ball direction
                             
                             b.hp--; // Decrement brick HP
@@ -285,16 +317,16 @@ document.addEventListener('DOMContentLoaded', function() {
                             }
                             
                             let allBricksHit = true;
-                            for(let col=0; col<brickColumnCount; col++) {
-                                for(let row=0; row<brickRowCount; row++) {
-                                    if(bricks[col][row].status === 1) { // Check if any brick is still active
+                            for(let checkR = 0; checkR < brickRowCount; checkR++) { // Check all bricks for win condition
+                                for(let checkC = 0; checkC < bricks[checkR].length; checkC++) {
+                                    if(bricks[checkR][checkC].status === 1) { 
                                         allBricksHit = false;
                                         break;
                                     }
                                 }
                                 if(!allBricksHit) break;
                             }
- 
+    
                             if (allBricksHit) {
                                 running = false;
                                 paused = true; // Pause on win
@@ -305,7 +337,7 @@ document.addEventListener('DOMContentLoaded', function() {
                 }
             }
         }
- 
+    
         // Main drawing and update loop
         function draw() {
             // Draw light blue gradient background
@@ -319,11 +351,11 @@ document.addEventListener('DOMContentLoaded', function() {
             drawPaddle();
             drawBall();
             collisionDetection();
- 
+    
             if (running && !paused) { // Only update if running and not paused
                 ballX += ballDX; // Update ball position
                 ballY += ballDY;
- 
+    
                 // Wall collisions (left/right)
                 if (ballX + ballRadius > canvasDisplayWidth || ballX - ballRadius < 0) {
                     ballDX = -ballDX;
@@ -332,13 +364,13 @@ document.addEventListener('DOMContentLoaded', function() {
                 if (ballY - ballRadius < 0) {
                     ballDY = -ballDY;
                 }
- 
+    
                 // Paddle collision
                 if (ballY + ballRadius >= canvasDisplayHeight - paddleHeight - 2 && // Ball reaches paddle height
                     ballX > paddleX && ballX < paddleX + paddleWidth) { // Ball is within paddle width
                     ballDY = -ballDY; // Reverse ball direction
                 }
- 
+    
                 // Ball falls off bottom - reset position and pause
                 if (ballY + ballRadius > canvasDisplayHeight) {
                     ballX = canvasDisplayWidth / 2;
@@ -354,7 +386,7 @@ document.addEventListener('DOMContentLoaded', function() {
             }
             requestAnimationFrame(draw); // Loop drawing
         }
- 
+    
         // Function to start/restart the game
         function startGame() {
             if (!running || paused) { // Only start if not running or if paused
@@ -364,17 +396,17 @@ document.addEventListener('DOMContentLoaded', function() {
                     ballY = canvasDisplayHeight - paddleHeight - ballRadius - 5;
                     ballDX = ballSpeed;
                     ballDY = -ballSpeed;
-                    paddleX = (canvasDisplayWidth - paddleWidth) / 2; // Reset paddle position
+                    paddleX = (canvas.width - paddleWidth) / 2; // Reset paddle position
                 }
                 running = true; // Set game to running
                 paused = false; // Unpause the game
             }
         }
- 
+    
         // Assign clickwheel button actions for the game
         document.getElementById('menu-button').onclick = exitGame; // Menu button exits game
         document.getElementById('select-button').onclick = startGame; // Select button starts/restarts game
- 
+    
         // Clickwheel rotation for paddle control
         clickwheel.addEventListener('mousemove', function(e) {
             if (!gameMode || !running) return; // Only move paddle if game is active and running
@@ -382,26 +414,26 @@ document.addEventListener('DOMContentLoaded', function() {
             const centerX = rect.left + rect.width / 2;
             const centerY = rect.top + rect.height / 2;
             const angle = Math.atan2(e.clientY - centerY, e.clientX - centerX);
- 
+    
             if (lastAngle !== null) {
                 let diff = angle - lastAngle;
                 if (diff > Math.PI) diff -= 2 * Math.PI;
                 if (diff < -Math.PI) diff += 2 * Math.PI;
- 
+    
                 // Adjust paddleX based on rotation difference, scaled by canvas width
                 paddleX += diff * (canvasDisplayWidth * 0.15); // Adjusted sensitivity for slower movement
                 // Keep paddle within canvas bounds
                 if (paddleX < 0) paddleX = 0;
-                if (paddleX + paddleWidth > canvasDisplayWidth) paddleX = canvas.width - paddleWidth;
+                if (paddleX + paddleWidth > canvasDisplayWidth) paddleX = canvasDisplayWidth - paddleWidth;
             }
             lastAngle = angle;
         });
- 
+    
         // Initialize bricks and start drawing loop
         initBricks();
         draw();
     }
- 
+    
     // Mobile proportional scaling (from previous discussions)
     function scaleIpod() {
         const wrapper = document.querySelector('.ipod-wrapper');
@@ -417,7 +449,7 @@ document.addEventListener('DOMContentLoaded', function() {
             wrapper.style.removeProperty('--ipod-scale');
         }
     }
- 
+    
     window.addEventListener('load', scaleIpod);
     window.addEventListener('resize', scaleIpod);
- });
+    });
